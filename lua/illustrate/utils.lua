@@ -15,9 +15,13 @@ function M.get_path_to_illustration_dir()
     end
 
     local function search_in_parent_directories(path)
+
       -- Path pkm setup
-      if config.options.pkm and config.options.pkm.path_pkm and config.options.pkm.relative_path_attachments_of_pkm and vim.bo.filetype == "markdown" then
-          return config.options.pkm.path_pkm .. "/" .. config.options.pkm.relative_path_attachments_of_pkm
+      local current_file_dir = vim.fn.expand("%:p:h")
+      local pkm_root_path = config.options.pkm.path_pkm
+      if config.options.pkm and pkm_root_path and config.options.pkm.relative_path_attachments_of_pkm and vim.bo.filetype == "markdown" and current_file_dir:find(pkm_root_path, 1, true) == 1 then
+        vim.notify("Graphic create in PKM environment")
+        return config.options.pkm.path_pkm .. "/" .. config.options.pkm.relative_path_attachments_of_pkm
       end
 
         local parent_directory = vim.fn.fnamemodify(path, ":h")
@@ -316,7 +320,44 @@ function M.extract_path_from_typst_figure_environment()
     return path
 end
 
+local function get_illustration_files_from_buffer()
+  local buffer_content = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+  local resolved_paths = {}
+  local pkm_config = config.options.pkm
+
+  for path in buffer_content:gmatch("!%[.-%]%((.-)%)") do
+    path = path:match("^%s*(.-)%s*$") -- Trim whitespace
+
+    -- Ensure path is not empty
+    if path ~= "" then
+        if path:sub(1, 1) == '/' then
+            -- Absolute path, use as is
+            table.insert(resolved_paths, path)
+        elseif path:find('/') then
+            -- Relative path with directories, resolve it from current file's dir
+            local current_dir = vim.fn.expand("%:p:h")
+            table.insert(resolved_paths, vim.fn.resolve(current_dir .. '/' .. path))
+        else
+            -- Just a filename, use PKM attachment path
+            if pkm_config and pkm_config.path_pkm and pkm_config.relative_path_attachments_of_pkm then
+                local full_path = pkm_config.path_pkm .. "/" .. pkm_config.relative_path_attachments_of_pkm .. "/" .. path
+                table.insert(resolved_paths, full_path)
+            end
+        end
+    end
+  end
+  return resolved_paths
+end
+
 function M.get_all_illustration_files()
+  -- Check for PKM context
+  local current_file_dir = vim.fn.expand("%:p:h")
+  local pkm_root_path = config.options.pkm and config.options.pkm.path_pkm or nil
+  if pkm_root_path and vim.bo.filetype == "markdown" and current_file_dir:find(pkm_root_path, 1, true) == 1 then
+    -- Use the new buffer scanning logic
+    return get_illustration_files_from_buffer()
+  else
+  -- Original Logic
     local figures_path = M.get_path_to_illustration_dir()
     local files = vim.fn.globpath(figures_path, "*.svg", false, true)
     local ai_files = vim.fn.globpath(figures_path, "*.ai", false, true)
@@ -326,6 +367,7 @@ function M.get_all_illustration_files()
     end
 
     return files
+  end
 end
 
 function M.copy(source, destination)
@@ -342,6 +384,13 @@ function M.is_in_table(table, value)
 end
 
 function M.get_relative_path(path)
+    -- Manage PKM environment
+    local current_file_dir = vim.fn.expand("%:p:h")
+    local pkm_root_path = config.options.pkm and config.options.pkm.path_pkm or nil
+    if pkm_root_path and vim.bo.filetype == "markdown" and current_file_dir:find(pkm_root_path, 1, true) == 1 then
+      return vim.fn.fnamemodify(path, ":t") -- Devuelve solo el nombre del archivo
+    end
+
     local components = {}
     for component in string.gmatch(path, "[^/]+") do
         table.insert(components, component)
