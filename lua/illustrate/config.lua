@@ -79,6 +79,7 @@ local defaults = {
         svg = "inkscape",
         ai = "inkscape",
     },
+    pkm = nil -- {path_pkm= 'PATH', relative_path_attachments_of_pkm= 'PATH'}
 }
 
 M.options = {}

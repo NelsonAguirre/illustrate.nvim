@@ -15,12 +15,18 @@ function M.get_path_to_illustration_dir()
     end
 
     local function search_in_parent_directories(path)
+      -- Path pkm setup
+      if config.options.pkm and config.options.pkm.path_pkm and config.options.pkm.relative_path_attachments_of_pkm and vim.bo.filetype == "markdown" then
+          return config.options.pkm.path_pkm .. "/" .. config.options.pkm.relative_path_attachments_of_pkm
+      end
+
         local parent_directory = vim.fn.fnamemodify(path, ":h")
         if path == parent_directory then
             return nil -- Reached root directory, return nil
         elseif directory_exists(path) then
             return path .. "/" .. directory_name
         else
+            -- Búsqueda recursiva hacia atrás hasta encontrar.
             return search_in_parent_directories(parent_directory)
         end
     end
